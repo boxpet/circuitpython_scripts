@@ -1,0 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 Justin Myers
+#
+# SPDX-License-Identifier: MIT
+
+pre-commit==3.7.1
