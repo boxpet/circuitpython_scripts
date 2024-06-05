@@ -19,7 +19,18 @@ is_microcontroller = sys.implementation.name == "circuitpython"
 
 
 _global_found_radios = {}
+_global_print = True
 _global_spi = None
+
+
+def enable_log(enable):
+    global _global_print  # noqa: PLW0603 Using the global statement to update variable is discouraged
+    _global_print = enable
+
+
+def log(value):
+    if _global_print:
+        print(value)
 
 
 def get_global_spi():
@@ -34,11 +45,11 @@ def get_global_spi():
 
 def connect_radio(radio):
     if not hasattr(radio, "connect"):
-        print("Radio does not need to connect")
+        log("Radio does not need to connect")
         return
 
     if radio.connected:
-        print("Already connected")
+        log("Already connected")
         return
 
     ssid = os.getenv("WIFI_SSID")
@@ -51,12 +62,12 @@ def connect_radio(radio):
     if ssid is None:
         raise AttributeError("Can't find SSID information in settings.toml")
 
-    print(f"Connecting to SSID: {ssid}")
+    log(f"Connecting to SSID: {ssid}")
     try:
         radio.connect(ssid, password)
     except TypeError:
         radio.connect_AP(ssid, password)
-    print("Connected")
+    log("Connected")
 
 
 def get_pin(env_name, default):
@@ -77,7 +88,7 @@ def get_cpython_radio(raise_exception=True):
     radio = adafruit_connection_manager.CPythonNetwork()
 
     _global_found_radios["cpython"] = radio
-    print("Running CPython")
+    log("Running CPython")
     return radio
 
 
@@ -122,7 +133,7 @@ def get_esp32spi_radio(raise_exception=True):
         return None
 
     _global_found_radios["esp32spi"] = radio
-    print("Found ESP32SPI")
+    log("Found ESP32SPI")
     return radio
 
 
@@ -140,7 +151,7 @@ def get_wifi_radio(raise_exception=True):
     radio = wifi.radio
 
     _global_found_radios["wifi"] = radio
-    print("Found native Wifi")
+    log("Found native Wifi")
     return radio
 
 
@@ -169,13 +180,13 @@ def get_wiznet5k_radio(raise_exception=True):
         return None
 
     _global_found_radios["wiznet5k"] = radio
-    print("Found WIZnet5k")
+    log("Found WIZnet5k")
     return radio
 
 
 def get_radio(connect=True, force=None):
     radio = None
-    print("Detecting radio...")
+    log("Detecting radio...")
 
     if not is_microcontroller:
         radio = get_cpython_radio(raise_exception=False)

@@ -7,7 +7,7 @@ name = "circuitpython_scripts"
 authors = [
   { name="Justin Myers" },
 ]
-description = "A set if circuitpython scripts"
+description = "A set of circuitpython scripts"
 readme = "README.rst"
 requires-python = ">=3.8"
 classifiers = [
