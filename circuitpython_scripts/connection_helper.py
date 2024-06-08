@@ -43,6 +43,27 @@ def get_global_spi():
     return _global_spi
 
 
+def get_pin(env_name, default):
+    pin_name = os.getenv(env_name, default)
+    pin = getattr(board, pin_name, None)
+    if pin is None:
+        raise ValueError(f"Pin {pin_name} for {env_name} not found")
+    return pin
+
+
+def get_saved_radio(name):
+    if name in _global_found_radios:
+        return _global_found_radios[name]["radio"]
+    return None
+
+
+def save_radio(name, radio, pins=None):
+    _global_found_radios[name] = {
+        "radio": radio,
+        "pins": pins,
+    }
+
+
 def connect_radio(radio):
     if not hasattr(radio, "connect"):
         log("Radio does not need to connect")
@@ -70,31 +91,44 @@ def connect_radio(radio):
     log("Connected")
 
 
-def get_pin(env_name, default):
-    pin_name = os.getenv(env_name, default)
-    pin = getattr(board, pin_name, None)
-    if pin is None:
-        raise ValueError(f"Pin {pin_name} for {env_name} not found")
-    return pin
+def deinit_radio(radio):
+    match = None
+    for key, data in _global_found_radios.items():
+        if data["radio"] == radio:
+            match = key
+            break
+
+    if match is None:
+        raise ValueError("Radio not found")
+
+    pins = _global_found_radios[key]["pins"]
+    if isinstance(pins, list):
+        for pin in pins:
+            pin.deinit()
+
+    del _global_found_radios[key]
+    del radio
 
 
 def get_cpython_radio(raise_exception=True):
-    if "cpython" in _global_found_radios:
-        return _global_found_radios["cpython"]
+    radio = get_saved_radio("cpython")
+    if radio:
+        return radio
 
     if is_microcontroller and raise_exception:
         raise RuntimeError("CPython library not found")
 
     radio = adafruit_connection_manager.CPythonNetwork()
 
-    _global_found_radios["cpython"] = radio
+    save_radio("cpython", radio)
     log("Running CPython")
     return radio
 
 
 def get_esp32spi_radio(raise_exception=True):
-    if "esp32spi" in _global_found_radios:
-        return _global_found_radios["esp32spi"]
+    radio = get_saved_radio("esp32spi")
+    if radio:
+        return radio
 
     try:
         from adafruit_esp32spi import adafruit_esp32spi
@@ -132,14 +166,15 @@ def get_esp32spi_radio(raise_exception=True):
             raise RuntimeError("ESP32SPI radio not found") from exc
         return None
 
-    _global_found_radios["esp32spi"] = radio
+    save_radio("esp32spi", radio, [esp32_chip_select, esp32_ready, esp32_reset])
     log("Found ESP32SPI")
     return radio
 
 
 def get_wifi_radio(raise_exception=True):
-    if "wifi" in _global_found_radios:
-        return _global_found_radios["wifi"]
+    radio = get_saved_radio("wifi")
+    if radio:
+        return radio
 
     try:
         import wifi
@@ -150,14 +185,15 @@ def get_wifi_radio(raise_exception=True):
 
     radio = wifi.radio
 
-    _global_found_radios["wifi"] = radio
+    save_radio("wifi", radio)
     log("Found native Wifi")
     return radio
 
 
 def get_wiznet5k_radio(raise_exception=True):
-    if "wiznet5k" in _global_found_radios:
-        return _global_found_radios["wiznet5k"]
+    radio = get_saved_radio("wiznet5k")
+    if radio:
+        return radio
 
     try:
         from adafruit_wiznet5k import adafruit_wiznet5k
@@ -167,11 +203,11 @@ def get_wiznet5k_radio(raise_exception=True):
             raise RuntimeError("WIZnet5k library not found") from exc
         return None
 
-    chip_select_pin = get_pin("WIZNET_CHIP_SELECT", "D10")
-    chip_select = digitalio.DigitalInOut(chip_select_pin)
+    wiznet_chip_select_pin = get_pin("WIZNET_CHIP_SELECT", "D10")
+    wiznet_chip_select = digitalio.DigitalInOut(wiznet_chip_select_pin)
     spi = get_global_spi()
     try:
-        radio = adafruit_wiznet5k.WIZNET5K(spi, chip_select, is_dhcp=True)
+        radio = adafruit_wiznet5k.WIZNET5K(spi, wiznet_chip_select, is_dhcp=True)
     except RuntimeError as exc:
         chip_select.deinit()
 
@@ -179,7 +215,7 @@ def get_wiznet5k_radio(raise_exception=True):
             raise RuntimeError("WIZnet5k radio not found") from exc
         return None
 
-    _global_found_radios["wiznet5k"] = radio
+    save_radio("wiznet5k", radio, [wiznet_chip_select])
     log("Found WIZnet5k")
     return radio
 
